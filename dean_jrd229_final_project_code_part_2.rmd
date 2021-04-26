@@ -1,0 +1,99 @@
+## Jeffrey Dean
+
+## Data Wrangling Final Project-Code Part 2 of 2
+## Bank Products Issues, Fraud, and the People Affected
+
+```{r}
+chooseCRANmirror(graphics=FALSE, ind=1)
+knitr::opts_chunk$set(echo = TRUE)
+library("janitor")
+library("vtree")
+library("tidyverse")
+library("dplyr") 
+library("tidytext") 
+library("stringr")
+library("rvest")
+library("stopwords")
+library("choroplethrMaps")
+library("choroplethr")
+library("plyr")
+library("lubridate")
+```
+
+## Code will support what banks have officially been served complaints by their users and how responsive they are to such issues.  In addition the work will support which institutions should improve and in what areas.  As a follow up I will pull information on identity theft of personal information and how this impacts similar sets of customers.  This is the second part of the work.
+
+
+bank_complaint_data <- read.csv(file = 'Bank_Complaint_Data.csv')
+
+bank_complaint_narratives <- bank_complaint_data %>% select(6)
+bank_complaint_narratives 
+
+data(stop_words)
+
+narrative_text <- bank_complaint_narratives %>% unnest_tokens(output = word, input = Consumer.complaint.narrative) 
+narrative_text  <- narrative_text  %>% anti_join(stop_words)
+narrative_wordcounts <- narrative_text  %>% count("word") %>% arrange(desc(freq))
+narrative_wordcounts <- narrative_wordcounts[-c(1, 2), ]
+top_narrative_wordcounts <- narrative_wordcounts[(1:30), ]
+
+top_narrative_wordcounts
+
+## The above is the cleaned top thirty words used in narratives for bank complaints as filed by consumers.  This gives an insight into what types of problem is occuring and how the customer feels about this.  This is a good use of natural language processing in action.  The first few words are the products themselves while later words support the issue in question.  We see words such as dispute, payments, balance, due, time, accounts, etc.  These words are a pattern of payments or activities that are either incorrect or late in action.  
+
+## Section 3
+
+## Fraud Information and the Consumer
+```{r}
+fraud_types_2020 <- read.csv(file = 'types_of_fraud_2020_data.csv')
+names(fraud_types_2020) <- fraud_types_2020[3,]
+fraud_types_2020 <- fraud_types_2020[-c(1:3),]
+fraud_types_2020 <- fraud_types_2020[-c(6:7),]
+
+colnames(fraud_types_2020) <- c("type_of_id_theft", "number_of_reports", "percent_of_total")
+fraud_types_2020$percent_of_total <- as.numeric(gsub("%","",fraud_types_2020$percent_of_total))
+
+fraud_type_breakdown <-ggplot(data=fraud_types_2020, aes(x=type_of_id_theft, y=percent_of_total)) +
+  geom_bar(stat="identity") + 
+  theme(axis.text.x = element_text(angle = 45, vjust = 0.5)) +
+  ggtitle("Percentage of Fraud by Type") 
+fraud_type_breakdown
+```
+
+## Above I cleaned the data for types of identity theft that have occured and then plotted the percentage of occurances in practice.  It's generally split evenly between different types of fraud that happen, with government benefits fraud and credit card fraud being the highest amount of problems.  This is due to data from consumers can make credit card fraud easier in the modern age (lots of transactions) while government benefits fraud has a high dollar amount and can be exploited by people as recipients are generally older or more vulnerable.
+```{r}
+fraud_url_data <- "https://www.iii.org/table-archive/21319"
+fraud_state_data <-fraud_url_data %>% read_html() %>% html_node("table") %>% html_table(fill = TRUE) %>% as_tibble()
+fraud_state_data_2 <- fraud_state_data[,(1:8)]
+fraud_state_data_2 <- fraud_state_data_2[-c(1), ]
+
+names(fraud_state_data_2) <- fraud_state_data_2[1,]
+fraud_state_data_2 <- fraud_state_data_2[-1,]
+
+set1 <- fraud_state_data_2[,1:4]
+set2 <- fraud_state_data_2[,5:8]
+
+fraud_state_data_2 <- merge(set1, set2, all = TRUE)
+
+fraud_state_chropleth_data <- fraud_state_data_2[,1:2]
+data(state.regions)
+
+colnames(fraud_state_chropleth_data) <- c("region", "value")
+fraud_state_chropleth_data$region = tolower(fraud_state_chropleth_data$region)
+fraud_state_chropleth_data$value <- as.numeric(gsub(",","",fraud_state_chropleth_data$value))
+
+fraud_state_chropleth_data <- fraud_state_chropleth_data %>% 
+  mutate(region = replace(region, region == 'd.c.', 'district of columbia'))
+
+fraud_state_chropleth_data <- fraud_state_chropleth_data[-c(40), ]
+ 
+fraud_state_chropleth_plot <- state_choropleth(fraud_state_chropleth_data, 
+                 title  = "US State Fraud Reporting per 100,000 people", 
+                 legend = "Number of Reports")
+fraud_state_chropleth_plot
+```
+
+## All of the above lines are built in order to clean and prepare data in order to build the second set choropleth similiar to bank complaints. This set is controlled to show reporting per 100000 people in order to control for population density.  The first set is different for this reason, but we can see different patterns. Places such as Nevada, Georgia, Washington, and Florida have high levels of fraud relative to population.  The reason in my opinion is that these areas have a high number of elderly people and thus are vulnerable to fraud incidents.  
+
+## Closing Thoughts
+
+## Beyond the data and visuals built in R, looking forward we can examine why complaints or fraud occur or later in the process we can find positive solutions to such issues as complaints or fraud.  There were few surprises as information unfolded.  I am proud to use these tools to solve real world issues and R is important as a tool to process high volumes of data when handmade calculations are impossible or tools such as Excel are not enough to generate conclusions for this volume.  
